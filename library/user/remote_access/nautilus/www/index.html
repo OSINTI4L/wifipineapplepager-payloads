@@ -88,14 +88,20 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .empty p{font-size:0.85em}
 @media(max-width:1100px){.main{flex-direction:column}.main-left{max-width:none;border-right:none;border-bottom:1px solid var(--border);max-height:200px}.main-right{flex:1;flex-direction:column}.console-panel:first-child{border-right:none;border-bottom:1px solid var(--border)}}
 @media(max-width:700px){.container{flex-direction:column}.sidebar{width:100%;max-height:35vh;border-right:none;border-bottom:1px solid var(--border)}.main{flex:1}.main-left{max-height:150px}.main-right{flex-direction:column}}
-.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:none;justify-content:center;align-items:center;z-index:1000;backdrop-filter:blur(4px)}
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:none;justify-content:center;align-items:center;z-index:1000;backdrop-filter:blur(4px);transition:backdrop-filter 0.15s,background 0.15s}
 .modal-overlay.show{display:flex}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;min-width:300px;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+.modal-overlay.peek{backdrop-filter:none;background:rgba(0,0,0,0.3)}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;min-width:300px;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,0.5);transition:opacity 0.15s}
+.modal-overlay.peek .modal{opacity:0.5}
+.modal-peek-btn{position:absolute;top:8px;right:8px;background:transparent;border:none;cursor:pointer;padding:6px;border-radius:6px;opacity:0.5;transition:opacity 0.15s}
+.modal-peek-btn:hover{opacity:1}
+.modal-peek-btn svg{width:18px;height:18px;fill:var(--text2)}
+.modal{position:relative}
 .modal-title{font-size:1.1em;font-weight:600;color:var(--accent);margin-bottom:10px}
 .modal-message{color:var(--text);line-height:1.5;margin-bottom:16px;font-size:0.95em}
 .modal-input{width:100%;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:1em;margin-bottom:16px}
 .modal-input:focus{outline:none;border-color:var(--accent)}
-.modal-buttons{display:flex;gap:10px;justify-content:flex-end}
+.modal-buttons{display:flex;gap:10px;justify-content:center}
 .login-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;justify-content:center;align-items:center;z-index:2000}
 .login-overlay.hidden{display:none}
 .login-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;width:320px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.5)}
@@ -329,6 +335,7 @@ Scanning for networks...
 </div>
 <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this){if(installing){stopInstall();}$('modalOverlay').classList.remove('show');}">
 <div class="modal" onclick="event.stopPropagation()">
+<button class="modal-peek-btn" title="Hold to peek behind" onmousedown="$('modalOverlay').classList.add('peek')" onmouseup="$('modalOverlay').classList.remove('peek')" onmouseleave="$('modalOverlay').classList.remove('peek')"><svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg></button>
 <div class="modal-title" id="modalTitle">Confirm</div>
 <div class="modal-message" id="modalMessage"></div>
 <input type="text" class="modal-input" id="modalInput" style="display:none">
@@ -1862,8 +1869,7 @@ function showPrompt(type,message,defaultVal){
     inp.placeholder=promptPlaceholders[type]||'';
     inp.value=currentPromptDefault;
     confirmBtn.textContent='Submit';
-    cancelBtn.textContent='Cancel';
-    cancelBtn.style.display='';
+    cancelBtn.style.display='none';
     $('modalTitle').style.color='';
     inp.oninput=()=>validatePromptInput();
     setTimeout(()=>{inp.focus();inp.select();},100);
