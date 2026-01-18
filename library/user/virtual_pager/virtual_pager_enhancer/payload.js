@@ -100,7 +100,8 @@ async function getFullConfig() {
 async function saveFullConfig(newData) {
     const current = await getFullConfig();
     const merged = { ...current, ...newData };
-    return await sendServerRequest("setconfig", JSON.stringify(merged), false, true);
+    await sendServerRequest("setconfig", JSON.stringify(merged), false, true);
+    return merged;
 }
 
 function applyBackgroundTheme(value, isColorOnly = false) {
@@ -214,7 +215,7 @@ function initPayloadUpdater() {
         container.innerHTML = '<p style="text-align:center;color:#ccc;margin-bottom:15px;">Update your local payload library from the official repository. <br><br>This will overwrite all your payloads!</p><button id="btnRunUpdate" class="btn-update-info">Update Now</button>';
         document.getElementById("btnRunUpdate").onclick = async () => {
             container.innerHTML = '<div class="loader"></div><div style="margin-top:15px;color:#aaa;">Updating payloads...</div>';
-            const res = await sendServerRequest("updatepayloads", undefined, true, true);
+            const res = await sendServerRequest("update_payloads", undefined, true, true);
             if (res && res.okay) {
                 container.innerHTML = `<i class="material-icons" style="font-size:40px;color:#00ffaa;margin-bottom:10px;">check_circle</i><div style="color:#fff;">${res.message}</div>`;
             } else {
@@ -289,9 +290,9 @@ function initPagerSkinner() {
                     const updateData = {};
                     const keyName = type === "bg" ? "appliedBackgroundName" : "appliedPagerSkinName";
                     updateData[keyName] = isApplied ? "" : item.name;
-                    await saveFullConfig(updateData);
-                    await loadConfigAndApply();
-                    renderLibraries(await getFullConfig(), overlay);
+                    const updated = await saveFullConfig(updateData);
+                    loadConfigAndApply(updated);
+                    renderLibraries(updated, overlay);
                 };
 
                 div.querySelector(".delete-btn").onclick = async (e) => {
@@ -303,9 +304,9 @@ function initPagerSkinner() {
                     if (activeName === item.name) {
                         updateData[type === "bg" ? "appliedBackgroundName" : "appliedPagerSkinName"] = "";
                     }
-                    await saveFullConfig(updateData);
-                    await loadConfigAndApply();
-                    renderLibraries(await getFullConfig(), overlay);
+                    const updated = await saveFullConfig(updateData);
+                    loadConfigAndApply(updated);
+                    renderLibraries(updated, overlay);
                 };
                 listContainer.appendChild(div);
             });
@@ -362,12 +363,11 @@ function initPagerSkinner() {
         reader.onload = async (ev) => {
             try {
                 const importedConfig = JSON.parse(ev.target.result);
-                await saveFullConfig(importedConfig);
-                await loadConfigAndApply();
-                const newConfig = await getFullConfig();
-                renderLibraries(newConfig, overlay);
-                if (newConfig.backgroundHex) bgPicker.value = newConfig.backgroundHex;
-                if (newConfig.pagerHex) pagerPicker.value = newConfig.pagerHex;
+                const updated = await saveFullConfig(importedConfig);
+                loadConfigAndApply(updated);
+                renderLibraries(updated, overlay);
+                if (updated.backgroundHex) bgPicker.value = updated.backgroundHex;
+                if (updated.pagerHex) pagerPicker.value = updated.pagerHex;
                 alert("Theme imported successfully!");
             } catch (err) { alert("Failed to import. Invalid JSON file."); }
         };
@@ -385,9 +385,9 @@ function initPagerSkinner() {
             items.push({ name: n.value, url: e.target.result });
             const updateData = {};
             updateData[configKey] = items;
-            await saveFullConfig(updateData);
+            const updated = await saveFullConfig(updateData);
             n.value = ""; f.value = "";
-            renderLibraries(await getFullConfig(), overlay);
+            renderLibraries(updated, overlay);
         };
         r.readAsDataURL(file);
     };
@@ -396,15 +396,32 @@ function initPagerSkinner() {
     overlay.querySelector("#btnUploadPager").onclick = () => handleUpload("#pagerImgName", "#pagerImgFile", "savedPagerSkins");
 
     bgPicker.oninput = (e) => applyBackgroundTheme(e.target.value, true);
-    bgPicker.onchange = async (e) => { await saveFullConfig({ backgroundHex: e.target.value, appliedBackgroundName: "" }); renderLibraries(await getFullConfig(), overlay); };
-    overlay.querySelector("#btnResetBg").onclick = async () => { await saveFullConfig({ backgroundHex: defaultBgHex, appliedBackgroundName: "" }); applyBackgroundTheme(defaultBgHex, true); bgPicker.value = defaultBgHex; renderLibraries(await getFullConfig(), overlay); };
+    bgPicker.onchange = async (e) => { 
+        const updated = await saveFullConfig({ backgroundHex: e.target.value, appliedBackgroundName: "" }); 
+        renderLibraries(updated, overlay); 
+    };
+    overlay.querySelector("#btnResetBg").onclick = async () => { 
+        const updated = await saveFullConfig({ backgroundHex: defaultBgHex, appliedBackgroundName: "" }); 
+        applyBackgroundTheme(defaultBgHex, true); 
+        bgPicker.value = defaultBgHex; 
+        renderLibraries(updated, overlay); 
+    };
 
     pagerPicker.oninput = (e) => {
         const fillEl = document.getElementById("pager-custom-fill");
         if(fillEl) fillEl.querySelectorAll("path, rect, circle, polygon, ellipse").forEach(el => el.style.fill = e.target.value);
     };
-    pagerPicker.onchange = async (e) => { await saveFullConfig({ pagerHex: e.target.value, appliedPagerSkinName: "" }); await loadConfigAndApply(); renderLibraries(await getFullConfig(), overlay); };
-    overlay.querySelector("#btnResetPager").onclick = async () => { await saveFullConfig({ pagerHex: defaultPagerHex, appliedPagerSkinName: "" }); await loadConfigAndApply(); pagerPicker.value = defaultPagerHex; renderLibraries(await getFullConfig(), overlay); };
+    pagerPicker.onchange = async (e) => { 
+        const updated = await saveFullConfig({ pagerHex: e.target.value, appliedPagerSkinName: "" }); 
+        loadConfigAndApply(updated); 
+        renderLibraries(updated, overlay); 
+    };
+    overlay.querySelector("#btnResetPager").onclick = async () => { 
+        const updated = await saveFullConfig({ pagerHex: defaultPagerHex, appliedPagerSkinName: "" }); 
+        loadConfigAndApply(updated); 
+        pagerPicker.value = defaultPagerHex; 
+        renderLibraries(updated, overlay); 
+    };
 
     const ul = document.querySelector("#sidebarnav ul");
     if (!ul || document.getElementById("pagerSkinnerBtn")) return;
@@ -421,8 +438,8 @@ function initPagerSkinner() {
     };
 }
 
-async function loadConfigAndApply() {
-    const config = await getFullConfig();
+async function loadConfigAndApply(providedConfig = null) {
+    const config = providedConfig || await getFullConfig();
     
     if (config.appliedBackgroundName) {
         const activeObj = (config.savedBackgrounds || []).find(b => b.name === config.appliedBackgroundName);
@@ -431,12 +448,7 @@ async function loadConfigAndApply() {
         applyBackgroundTheme(config.backgroundHex || "#303030", true);
     }
     
-    const sidebar = document.getElementById("sidebarnav");
-    const isSidebarVisible = sidebar && sidebar.offsetParent !== null && window.getComputedStyle(sidebar).display !== 'none';
-    
-    if (isSidebarVisible) {
-        applyPagerTheme(config);
-    }
+    applyPagerTheme(config);
 }
 
 async function initPagerSVG() {
@@ -454,6 +466,7 @@ async function initPagerSVG() {
         const borderUrl = URL.createObjectURL(borderBlob);
 
         const w = document.createElement("div");
+        w.id = "pager-custom-wrapper";
         w.style.cssText = "position:relative;display:inline-block;";
         t.parentNode.insertBefore(w, t);
         
@@ -483,17 +496,7 @@ async function initPagerSVG() {
         });
 
         const config = await getFullConfig();
-        const sidebar = document.getElementById("sidebarnav");
-        const isSidebarVisible = sidebar && sidebar.offsetParent !== null && window.getComputedStyle(sidebar).display !== 'none';
-        
-        if (isSidebarVisible) {
-            applyPagerTheme(config);
-        } else {
-             ["pager-custom-fill", "pager-custom-border", "pager-custom-image"].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.style.display = "none";
-            });
-        }
+        applyPagerTheme(config);
     }
 }
 
@@ -522,11 +525,6 @@ function startInitialization() {
             if (isSidebarVisible) {
                 const config = await getFullConfig();
                 applyPagerTheme(config);
-            } else {
-                ["pager-custom-fill", "pager-custom-border", "pager-custom-image"].forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) el.style.display = "none";
-                });
             }
         }
     };
